@@ -47,8 +47,8 @@ export default function CalorieTracker({ userId, targets, profile }: Props) {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setResults(data.results);
-    } catch {
-      setSearchError('Could not look up that food. Check your internet connection or try again.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err); setSearchError(`Error: ${msg}`);
     } finally {
       setSearching(false);
     }

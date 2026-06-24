@@ -5,7 +5,10 @@ export async function POST(req: NextRequest) {
   if (!query) return NextResponse.json({ error: 'No query provided' }, { status: 400 });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: 'API key not configured' }, { status: 500 });
+  if (!apiKey) {
+    console.error('ANTHROPIC_API_KEY is not set');
+    return NextResponse.json({ error: 'API key not configured on server' }, { status: 500 });
+  }
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -30,10 +33,16 @@ Rules:
 - If it is a meal with multiple items, return each item separately
 - Round all numbers to nearest integer
 - Return 1-4 items max
-- Be accurate with portions — if they say 200g rice, use 200g not a default serving`
+- Be accurate with portions`
         }]
       })
     });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Anthropic API error:', response.status, errText);
+      return NextResponse.json({ error: `Anthropic error: ${response.status}` }, { status: 500 });
+    }
 
     const data = await response.json();
     const text = data.content?.[0]?.text || '';
@@ -42,6 +51,6 @@ Rules:
     return NextResponse.json({ results: parsed });
   } catch (err) {
     console.error('Food lookup error:', err);
-    return NextResponse.json({ error: 'Failed to look up food' }, { status: 500 });
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
