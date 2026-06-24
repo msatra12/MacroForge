@@ -5,11 +5,30 @@ import { getFoodEntries, saveFoodEntry, deleteFoodEntry, getAllFoodEntries } fro
 import { uid, today, formatDate } from '@/lib/macros';
 
 interface Props { userId: string; targets: MacroTargets; profile: Profile; }
-interface FoodResult { name: string; calories: number; proteinG: number; carbsG: number; fatG: number; }
+interface FoodResult { name: string; calories: number; proteinG: number; carbsG: number; fatG: number; source?: string; }
+
+const HOME_EXAMPLES = [
+  { food: 'Scrambled eggs', amount: '3' },
+  { food: 'Brioche bread', amount: '3 slices' },
+  { food: 'White rice', amount: '200g' },
+  { food: 'Chicken breast', amount: '150g' },
+  { food: 'Oats', amount: '80g' },
+  { food: 'Banana', amount: '1' },
+];
+
+const RESTAURANT_EXAMPLES = [
+  { food: 'Big Mac', amount: '1' },
+  { food: 'Chipotle chicken burrito bowl', amount: '1 serving' },
+  { food: 'Starbucks caramel latte', amount: 'grande' },
+  { food: 'Subway 6 inch chicken teriyaki', amount: '1' },
+  { food: 'McDonald\'s large fries', amount: '1' },
+  { food: 'Nando\'s quarter chicken', amount: '1 serving' },
+];
 
 export default function CalorieTracker({ userId, targets, profile }: Props) {
   const [date, setDate] = useState(today());
   const [entries, setEntries] = useState<FoodEntry[]>([]);
+  const [mealType, setMealType] = useState<'home' | 'restaurant'>('home');
   const [foodName, setFoodName] = useState('');
   const [amount, setAmount] = useState('');
   const [searching, setSearching] = useState(false);
@@ -32,23 +51,19 @@ export default function CalorieTracker({ userId, targets, profile }: Props) {
     setSearching(true);
     setResults([]);
     setSearchError('');
-
-    // Build a natural query combining food + amount
-    const query = amount.trim()
-      ? `${amount} ${foodName}`
-      : foodName;
-
+    const query = amount.trim() ? `${amount} ${foodName}` : foodName;
     try {
       const res = await fetch('/api/food-lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, mealType }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setResults(data.results);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err); setSearchError(`Error: ${msg}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      setSearchError(`Error: ${msg}`);
     } finally {
       setSearching(false);
     }
@@ -112,6 +127,7 @@ export default function CalorieTracker({ userId, targets, profile }: Props) {
   const calPct = Math.min((totals.calories / targets.calories) * 100, 100);
   const calOver = totals.calories > targets.calories;
   const calRemain = targets.calories - totals.calories;
+  const examples = mealType === 'home' ? HOME_EXAMPLES : RESTAURANT_EXAMPLES;
 
   // History view
   if (showHistory) return (
@@ -138,7 +154,7 @@ export default function CalorieTracker({ userId, targets, profile }: Props) {
             {dayEntries.map(e => (
               <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '5px 0', borderTop: '1px solid var(--border)' }}>
                 <span style={{ color: 'var(--muted)' }}>{e.name}</span>
-                <span style={{ color: 'var(--text)' }}>{e.calories} kcal · P:{e.proteinG}g C:{e.carbsG}g F:{e.fatG}g</span>
+                <span>{e.calories} kcal · P:{e.proteinG}g C:{e.carbsG}g F:{e.fatG}g</span>
               </div>
             ))}
           </div>
@@ -215,43 +231,64 @@ export default function CalorieTracker({ userId, targets, profile }: Props) {
 
       {/* Food Search */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem', marginBottom: '1rem' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>🔍 Log Food</div>
-        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-          Enter the food and the amount — we&apos;ll calculate the macros for you automatically.
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: '0.75rem' }}>🍽️ Log Food</div>
+
+        {/* Home vs Restaurant toggle */}
+        <div style={{ display: 'flex', background: 'var(--surface2)', borderRadius: 10, padding: 4, marginBottom: '1rem', border: '1px solid var(--border)' }}>
+          <button onClick={() => { setMealType('home'); setResults([]); setFoodName(''); setAmount(''); }} style={{
+            flex: 1, padding: '10px', borderRadius: 7,
+            background: mealType === 'home' ? 'var(--accent)' : 'transparent',
+            color: mealType === 'home' ? '#000' : 'var(--muted)',
+            fontWeight: 700, fontSize: 13, transition: 'all 0.2s',
+          }}>
+            🏠 Cooked at Home
+          </button>
+          <button onClick={() => { setMealType('restaurant'); setResults([]); setFoodName(''); setAmount(''); }} style={{
+            flex: 1, padding: '10px', borderRadius: 7,
+            background: mealType === 'restaurant' ? 'var(--accent)' : 'transparent',
+            color: mealType === 'restaurant' ? '#000' : 'var(--muted)',
+            fontWeight: 700, fontSize: 13, transition: 'all 0.2s',
+          }}>
+            🏪 Restaurant / Takeaway
+          </button>
         </div>
 
-        {/* Two inputs side by side */}
+        {/* Context hint */}
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12, padding: '8px 12px', background: 'var(--surface2)', borderRadius: 8 }}>
+          {mealType === 'home'
+            ? '🏠 Enter ingredients with measurements — e.g. "3 eggs" or "200g chicken breast"'
+            : '🏪 Enter the restaurant name and dish — e.g. "McDonald\'s Big Mac" or "Nando\'s quarter chicken". We\'ll look up the exact calories from the menu.'}
+        </div>
+
+        {/* Inputs */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, marginBottom: 8 }}>
           <div>
-            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Food name</label>
+            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+              {mealType === 'home' ? 'Food / Ingredient' : 'Restaurant & Dish Name'}
+            </label>
             <input
               value={foodName}
               onChange={e => setFoodName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && searchFood()}
-              placeholder="e.g. scrambled eggs, rice, brioche bread..."
+              placeholder={mealType === 'home' ? 'e.g. chicken breast, oats, eggs...' : "e.g. McDonald's Big Mac, Starbucks latte..."}
             />
           </div>
           <div style={{ minWidth: 120 }}>
-            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Amount</label>
+            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+              {mealType === 'home' ? 'Amount' : 'Serving'}
+            </label>
             <input
               value={amount}
               onChange={e => setAmount(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && searchFood()}
-              placeholder="e.g. 2, 200g, 1 cup"
+              placeholder={mealType === 'home' ? 'e.g. 200g, 3, 1 cup' : 'e.g. 1, large, 2x'}
             />
           </div>
         </div>
 
-        {/* Examples */}
+        {/* Quick examples */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-          {[
-            { food: 'Scrambled eggs', amount: '3' },
-            { food: 'Brioche bread', amount: '3 slices' },
-            { food: 'White rice', amount: '200g' },
-            { food: 'Chicken breast', amount: '150g' },
-            { food: 'Oats', amount: '80g' },
-            { food: 'Banana', amount: '1' },
-          ].map(ex => (
+          {examples.map(ex => (
             <button key={ex.food} onClick={() => { setFoodName(ex.food); setAmount(ex.amount); }} style={{
               background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--muted)',
               padding: '4px 10px', borderRadius: 20, fontSize: 11,
@@ -266,7 +303,9 @@ export default function CalorieTracker({ userId, targets, profile }: Props) {
           padding: '11px', borderRadius: 8, fontWeight: 700, fontSize: 14,
           opacity: searching || !foodName.trim() ? 0.5 : 1,
         }}>
-          {searching ? `Looking up "${amount ? amount + ' ' : ''}${foodName}"...` : 'Look Up Macros'}
+          {searching
+            ? mealType === 'restaurant' ? `🔍 Looking up menu data...` : `Calculating macros...`
+            : mealType === 'restaurant' ? '🔍 Look Up Restaurant Macros' : '📊 Calculate Home Meal Macros'}
         </button>
 
         {searchError && (
@@ -289,10 +328,13 @@ export default function CalorieTracker({ userId, targets, profile }: Props) {
                   onMouseOver={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
                   onMouseOut={e => (e.currentTarget.style.borderColor = 'var(--border)')}
                 >
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{r.name}</div>
                     <div style={{ fontSize: 12, color: 'var(--muted)' }}>
                       Protein: {r.proteinG}g · Carbs: {r.carbsG}g · Fat: {r.fatG}g
+                    </div>
+                    <div style={{ fontSize: 11, marginTop: 3, color: r.source === 'official' ? 'var(--accent)' : 'var(--muted)' }}>
+                      {r.source === 'official' ? '✓ Official menu data' : '~ Calculated from ingredients'}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -301,12 +343,10 @@ export default function CalorieTracker({ userId, targets, profile }: Props) {
                   </div>
                 </button>
               ))}
-              <button onClick={() => { setResults([]); }} style={{
+              <button onClick={() => setResults([])} style={{
                 background: 'none', border: '1px dashed var(--border)', color: 'var(--muted)',
                 padding: '8px', borderRadius: 8, fontSize: 12,
-              }}>
-                Clear
-              </button>
+              }}>Clear</button>
             </div>
           </div>
         )}

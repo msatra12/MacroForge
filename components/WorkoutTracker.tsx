@@ -23,7 +23,8 @@ export default function WorkoutTracker({ userId, athleteType, units }: { userId:
 
   useEffect(() => { setWorkouts(getWorkouts(userId)); setPRs(getPRs(userId)); }, [userId]);
 
-  const wLabel = weightLabel(units);
+  const [sessionUnits, setSessionUnits] = useState<'metric' | 'imperial'>(units);
+  const wLabel = weightLabel(sessionUnits);
 
   function changeDate(delta: number) {
     const d = new Date(selectedDate);
@@ -56,7 +57,7 @@ export default function WorkoutTracker({ userId, athleteType, units }: { userId:
   function updateSet(exId: string, setIdx: number, field: 'weightKg' | 'reps' | 'distanceKm' | 'timeSec', rawValue: number) {
     if (!session) return;
     // Convert weight input to kg for storage
-    const value = (field === 'weightKg') ? weightToKg(rawValue, units) : rawValue;
+    const value = (field === 'weightKg') ? weightToKg(rawValue, sessionUnits) : rawValue;
     setSession(s => s ? {
       ...s, exercises: s.exercises.map(e => e.id === exId ? {
         ...e, sets: e.sets.map((st, i) => i === setIdx ? { ...st, [field]: value } : st)
@@ -157,7 +158,7 @@ export default function WorkoutTracker({ userId, athleteType, units }: { userId:
                           <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 3 }}>{ex.name}</div>
                           {ex.sets.map((st, i) => (
                             <div key={i} style={{ fontSize: 12, color: 'var(--muted)', paddingLeft: 10 }}>
-                              Set {i+1}: {kgToDisplay(st.weightKg, units)}{wLabel} × {st.reps} reps
+                              Set {i+1}: {kgToDisplay(st.weightKg, sessionUnits)}{wLabel} × {st.reps} reps
                             </div>
                           ))}
                         </div>
@@ -198,7 +199,7 @@ export default function WorkoutTracker({ userId, athleteType, units }: { userId:
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: 20 }}>{session.type.toUpperCase()} SESSION</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{selectedDate === today() ? 'Today' : formatDate(selectedDate)} · weights in {wLabel}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}><span style={{ fontSize: 12, color: 'var(--muted)' }}>{selectedDate === today() ? 'Today' : formatDate(selectedDate)}</span><div style={{ display: 'flex', background: 'var(--surface2)', borderRadius: 6, padding: 2, border: '1px solid var(--border)' }}>{(['metric', 'imperial'] as const).map(u => (<button key={u} onClick={() => setSessionUnits(u)} style={{ padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: sessionUnits === u ? 'var(--accent)' : 'transparent', color: sessionUnits === u ? '#000' : 'var(--muted)', transition: 'all 0.2s' }}>{u === 'metric' ? 'kg' : 'lbs'}</button>))}</div></div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setSession(null)} style={{ background: 'var(--surface2)', color: 'var(--muted)', padding: '8px 14px', borderRadius: 8, fontSize: 13 }}>Discard</button>
@@ -246,8 +247,8 @@ export default function WorkoutTracker({ userId, athleteType, units }: { userId:
               {ex.sets.map((st, i) => (
                 <div key={i} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 32px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
                   <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', fontWeight: 600 }}>{i+1}</div>
-                  <input type="number" defaultValue={session.type === 'cardio' ? (st.distanceKm || '') : (kgToDisplay(st.weightKg, units) || '')}
-                    min="0" step={units === 'imperial' ? '1' : '0.5'}
+                  <input type="number" defaultValue={session.type === 'cardio' ? (st.distanceKm || '') : (kgToDisplay(st.weightKg, sessionUnits) || '')}
+                    min="0" step={sessionUnits === 'imperial' ? '1' : '0.5'}
                     onChange={e => updateSet(ex.id, i, session.type === 'cardio' ? 'distanceKm' : 'weightKg', Number(e.target.value))}
                     placeholder="0" style={{ textAlign: 'center', padding: '8px' }} />
                   <input type="number" defaultValue={session.type === 'cardio' ? (st.timeSec ? Math.round(st.timeSec/60) : '') : (st.reps || '')}
@@ -262,7 +263,7 @@ export default function WorkoutTracker({ userId, athleteType, units }: { userId:
               </button>
               {(() => {
                 const pr = prs.find(p => p.exerciseName === ex.name);
-                return pr ? <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 6 }}>🏆 Current PR: {kgToDisplay(pr.weightKg, units)}{wLabel} × {pr.reps} reps</div> : null;
+                return pr ? <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 6 }}>🏆 Current PR: {kgToDisplay(pr.weightKg, sessionUnits)}{wLabel} × {pr.reps} reps</div> : null;
               })()}
             </div>
           ))}
@@ -301,7 +302,7 @@ export default function WorkoutTracker({ userId, athleteType, units }: { userId:
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {ex.sets.map((st, i) => (
                       <span key={i} style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--surface2)', padding: '2px 8px', borderRadius: 20 }}>
-                        {kgToDisplay(st.weightKg, units)}{wLabel} × {st.reps}
+                        {kgToDisplay(st.weightKg, sessionUnits)}{wLabel} × {st.reps}
                       </span>
                     ))}
                   </div>
@@ -317,7 +318,7 @@ export default function WorkoutTracker({ userId, athleteType, units }: { userId:
       {view === 'prs' && (
         <div>
           <div style={{ fontWeight: 700, fontSize: 18, marginBottom: '0.5rem' }}>Personal Records</div>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: '1.5rem' }}>Auto-detected when you log a new best. Showing in {units}.</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: '1.5rem' }}>Auto-detected when you log a new best. Showing in {sessionUnits}.</div>
           {prs.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>🏆</div>
@@ -329,7 +330,7 @@ export default function WorkoutTracker({ userId, athleteType, units }: { userId:
                 <div key={pr.exerciseName} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '1rem' }}>
                   <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>🏆 {pr.exerciseName}</div>
                   <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)' }}>
-                    {kgToDisplay(pr.weightKg, units)}<span style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted)', marginLeft: 2 }}>{wLabel}</span>
+                    {kgToDisplay(pr.weightKg, sessionUnits)}<span style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted)', marginLeft: 2 }}>{wLabel}</span>
                   </div>
                   <div style={{ fontSize: 14, color: 'var(--text)', marginTop: 2 }}>× {pr.reps} reps</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>Set on {formatDate(pr.date)}</div>
