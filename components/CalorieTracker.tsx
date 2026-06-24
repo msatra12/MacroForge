@@ -304,7 +304,7 @@ export default function CalorieTracker({ userId, targets, profile }: Props) {
           opacity: searching || !foodName.trim() ? 0.5 : 1,
         }}>
           {searching
-            ? mealType === 'restaurant' ? `🔍 Looking up menu data...` : `Calculating macros...`
+            ? mealType === 'restaurant' ? `🔍 Searching menu... (may take 20–40s)` : `Calculating macros...`
             : mealType === 'restaurant' ? '🔍 Look Up Restaurant Macros' : '📊 Calculate Home Meal Macros'}
         </button>
 
